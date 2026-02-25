@@ -1,0 +1,1250 @@
+---
+title: "The same but different: evidence for the co-evolution of language and toolmaking through neural re-use"
+author: "Suhas Vijayakumar"
+date: 
+
+output:
+  html_document: 
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    number_sections: true
+    code_download: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+
+if (!require("pacman")) install.packages("pacman", "rmarkdown")
+pacman::p_load("here", "rmarkdown")
+```
+
+```{r load_data_and_functions}
+here::i_am("results/results.Rmd")
+source(here("code/load_dependencies.R"))
+source(here("code/preprocess_data.R"))
+source(here("code/analysis_functions.R"))
+source(here("code/plotting_functions.R"))
+source(here("code/table_functions.R"))
+
+ifelse(!dir.exists(here("results", "figures")),
+        dir.create(here("results", "figures")),
+        "Found directory for figures, continuing without creating.")
+
+ifelse(!dir.exists(here("results", "RData")),
+        dir.create(here("results", "RData")),
+        "Found directory for results, continuing without creating.")
+```
+
+Useful abbreviations: 
+
+- AF    = Arcuate Fasciculus 
+- SLF   = Superior Longitudinal Fasciculus (SLF II/III)
+- WM    = white matter
+- GM    = gray matter
+- L     = left hemisphere
+- R     = right hemisphere
+- AQ    = Asymmetry Quotient 
+- PCA   = Principal Component Analysis (PC_thin, PC_long - first two components of PCA)
+
+Regions of interest: 
+- PMv   = ventral Premotor
+- BA44  = Brodmann Area 44 (pars opercularis)
+- BA45  = Brodmann Area 45 (pars triangularis)
+- STG   = Superior Temporal Gyrus
+- MTG   = Middle Temporal Gyrus
+- ITG   = Inferior Temporal Gyrus
+- TP    = Temporal pole 
+- SPL   = Superior Parietal Lobule
+- SMG   = Supramarginal Gyrus
+- AG    = Angular Gyrus
+
+
+# Data description and summary statistics 
+
+```{r table_demographics, results='asis', eval=TRUE}
+# Load data from row 2 onward; header name is hard-coded for display
+df <- read.csv(
+  here("data", "participant_demographics.csv"),
+  skip = 1,
+  header = TRUE, check.names = FALSE, stringsAsFactors = FALSE
+)
+
+kable(
+  df,
+  caption = "**Table S1.** Participant demographics.",
+  align = "c", booktabs = TRUE, format = "html"
+  ) %>%
+  add_header_above(c(" " = 4, "Fine motor experience" = 3, "Gross motor experience" = 3, " " = 2), bold = TRUE, line = TRUE) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed", "responsive"),
+    full_width = TRUE, position = "center") %>%
+  footnote(general = "The skill with the greatest number of years of experience is show (and considered for analyses).")
+
+rm(df)
+
+```
+
+
+```{r descriptive_stats, results='asis', eval=TRUE}
+#===============================================================================
+# DESCRIPTIVE STATISTICS: behavioral measures
+#===============================================================================
+# pre-training (behavioral,  in all participants)
+df <- data %>%
+  filter(training == "pre") %>%
+  select(age, gross_motor_experience, fine_motor_experience, toolmaking_performance, PC_thin, PC_long, syntactic_complexity, AGL_d_grammaticality, AGL_d_chunk_strength) 
+
+descriptive_stats_behavior_PRE_training <- psych::describe(df)
+
+descriptive_stats_behavior_PRE_training <- descriptive_stats_behavior_PRE_training %>%
+  select(n, mean, sd, se, min, max, range, skew) %>%
+    mutate(across(where(is.numeric), ~ round(., 2)))
+
+kable(descriptive_stats_behavior_PRE_training, 
+      caption = "**Table S2. A** Descriptive statistics for behavioral measures (pre-training; all participants).", 
+      booktabs = TRUE) %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                full_width = TRUE, position = "center") %>% 
+  footnote(general = "AGL = Artificial Grammar Learning, n = number of samples, SD = standard deviation, SE = standard error of the mean")
+
+rm(df)
+```
+
+
+```{r descriptive_stats_post, results='asis', eval=TRUE}
+# post-training (behavioral,  in experimental group only)
+df <- data %>%
+  filter(training == "post") %>%
+  filter(group == "exp") %>%
+  select(toolmaking_performance, PC_thin, PC_long, syntactic_complexity)
+
+descriptive_stats_behavior_POST_training <- psych::describe(df) 
+
+descriptive_stats_behavior_POST_training <- descriptive_stats_behavior_POST_training %>%
+  select(n, mean, sd, se, min, max, range, skew) %>%
+    mutate(across(where(is.numeric), ~ round(., 2)))
+
+kable(descriptive_stats_behavior_POST_training, 
+      caption = "**Table S2. B** Descriptive statistics for behavioral measures (post-training; exp group).", 
+      booktabs = TRUE) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                full_width = TRUE, position = "center")
+
+
+rm(df)
+```
+
+# Tractography results
+
+## Arcuate Fasciculus
+
+### Tractography result
+```{r results_AF_tract_ROI, eval=TRUE}
+knitr::include_graphics(here::here("results", "import", "WM_ROI_AF.png"))
+```
+
+### White matter measures: average FA, WM tract volume 
+```{r results_AF_WM, eval=TRUE}
+### Tractography result
+df <- data %>%
+  filter(training == "pre") %>%
+  select(AF_L_averageFA, AF_R_averageFA, AF_L_volumeWM, AF_R_volumeWM)
+
+AF_averageFA_plot <- plot_wm_measures(
+    df = df,
+    vars = c("AF_L_averageFA","AF_R_averageFA"),
+    ylab = "Average FA",
+    title = "AF: average FA",
+    fill = color$AF,
+    ylim = c(0.3, 0.5),
+    size = 15
+)
+
+AF_volumeWM_plot <- plot_wm_measures(
+  df = df,
+  vars = c("AF_L_volumeWM","AF_R_volumeWM"),
+  ylab = expression(paste("Volume (mm"^3, ")")),
+  title = "AF: volume WM",
+  fill = color$AF,
+  ylim = c(0, 20000), 
+  size = 15
+)
+rm(df)
+
+ggpubr::ggarrange(AF_averageFA_plot, AF_volumeWM_plot, nrow = 1)
+```
+
+### Gray matter measure: termination volume
+```{r results_AF_GM, eval=TRUE}
+df <- data %>%
+  filter(training == "pre") %>%
+  select(all_of(c(var$AF_L_GM_terminations, var$AF_R_GM_terminations)))
+
+# Plot
+AF_GM_plot <- plot_gm_terminations(
+  data_pre   = df,
+  left_cols  = var$AF_L_GM_terminations,
+  right_cols = var$AF_R_GM_terminations,
+  roi_labels = roi_order$AF,
+  title      = "GM termination volume of AF",
+  fill_L     = color$pre$AF_L,
+  fill_R     = color$pre$AF_R,
+  base_size  = 15
+)
+AF_GM_plot
+
+rm(df)
+
+```
+
+### Asymmetry Quotients
+```{r plot_AF_AQ, eval=TRUE}
+df <- data %>% filter(training == "pre")
+
+# AF WM (2 measures)
+af_wm_vars   <- c("AQ_AF_averageFA", "AQ_AF_volumeWM")
+af_wm_labels <- c("average FA", "WM volume")
+
+af_wm_long <- pivot_AQ_long(df, af_wm_vars, af_wm_labels, out_name = "measure")
+
+AF_WM_plot <- plot_AQ(
+  dflong  = af_wm_long,
+  x_var   = "measure",
+  title   = "AQ of AF tract metrics",
+  fill_color= color$AF,
+  y_lim   = c(-2.1, 2.1)
+)
+
+# AF GM (7 ROIs)
+af_gm_vars   <- var$AQ_AF_GM_terminations
+af_gm_labels <- roi_order$AF
+
+af_gm_long <- pivot_AQ_long(df, af_gm_vars, af_gm_labels, out_name = "roi")
+
+AF_GM_plot <- plot_AQ(
+  dflong  = af_gm_long,
+  x_var   = "roi",
+  title   = "AQ of AF terminations in GM",
+  fill_color= color$AF,
+  y_lim   = c(-2.1, 2.1)
+)
+
+# Stack plots
+AQ_AF_figure <- stack_two(AF_WM_plot, AF_GM_plot, top_n = 1, bot_n = 1, ratio = 2.5)
+AQ_AF_figure
+
+rm(df)
+```
+
+## Superior Longitudinal Fasciculus  (SLF II/III)
+
+### Tractography result
+```{r results_SLF_tract_ROI, eval=TRUE}
+knitr::include_graphics(here::here("results", "import", "WM_ROI_SLF.png"))
+```
+
+### White matter measures: average FA, WM tract volume 
+```{r results_SLF_WM, eval=TRUE}
+df <- data %>%
+  filter(training == "pre") %>%
+  select(SLF_L_averageFA, SLF_R_averageFA, SLF_L_volumeWM, SLF_R_volumeWM)
+
+SLF_averageFA_plot <- plot_wm_measures(
+    df = df,
+    vars = c("SLF_L_averageFA","SLF_R_averageFA"),
+    ylab = "Average FA",
+    title = "SLF II/III: average FA",
+    fill = color$SLF,
+    ylim = c(0.3, 0.5),
+    size = 15
+)
+
+SLF_volumeWM_plot <- plot_wm_measures(
+  df = df,
+  vars = c("SLF_L_volumeWM","SLF_R_volumeWM"),
+  ylab = expression(paste("Volume (mm"^3, ")")),
+  title = "SLF II/III: volume WM",
+  fill = color$SLF,
+  ylim = c(0, 20000), 
+  size = 15
+)
+
+ggpubr::ggarrange(SLF_averageFA_plot, SLF_volumeWM_plot, nrow = 1)
+
+rm(df)
+```
+
+### Gray matter measure: termination volume
+```{r results_SLF_GM, eval=TRUE}
+df <- data %>%
+  filter(training == "pre") %>%
+  select(all_of(c(var$SLF_L_GM_terminations, var$SLF_R_GM_terminations)))
+
+# Plot
+SLF_GM_plot <- plot_gm_terminations(
+  data_pre   = df,
+  left_cols  = var$SLF_L_GM_terminations,
+  right_cols = var$SLF_R_GM_terminations,
+  roi_labels = roi_order$SLF,
+  title      = "GM terminations of SLF II/III",
+  fill_L     = color$pre$SLF_L,
+  fill_R     = color$pre$SLF_R,
+  base_size  = 15
+)
+SLF_GM_plot
+
+rm(df)
+```
+
+### Asymmetry Quotients
+```{r plot_SLF_AQ, eval=TRUE}
+df <- data %>% filter(training == "pre")
+
+# SLF WM (2 measures)
+slf_wm_vars   <- c("AQ_SLF_averageFA", "AQ_SLF_volumeWM")
+slf_wm_labels <- c("average FA", "WM volume")
+
+slf_wm_long <- pivot_AQ_long(df, slf_wm_vars, slf_wm_labels, out_name = "measure")
+
+SLF_WM_plot <- plot_AQ(
+  dflong  = slf_wm_long,
+  x_var   = "measure",
+  title   = "AQ of SLF II/III tract metrics",
+  fill_color= color$SLF,
+  y_lim   = c(-2.1, 2.1)
+)
+
+# SLF GM (6 ROIs)
+slf_gm_vars   <- var$AQ_SLF_GM_terminations
+slf_gm_labels <- roi_order$SLF
+
+slf_gm_long <- pivot_AQ_long(df, slf_gm_vars, slf_gm_labels, out_name = "roi")
+
+SLF_GM_plot <- plot_AQ(
+  dflong  = slf_gm_long,
+  x_var   = "roi",
+  title   = "AQ of SLF II/III terminations in GM",
+  fill_color= color$SLF,
+  y_lim   = c(-2.1, 2.1)
+)
+
+# Stack plots
+AQ_SLF_figure <- stack_two(SLF_WM_plot, SLF_GM_plot, top_n = 1, bot_n = 1, ratio = 2.5)
+AQ_SLF_figure
+
+rm(df)
+
+```
+
+# Visualize correlation between behavioral variables 
+```{r plot_behavioral_variables_in_panel_plot, out.width="100%", eval=TRUE}
+df <- data %>%
+  filter(training == "pre") %>%
+  select(age, gross_motor_experience, fine_motor_experience, 
+         toolmaking_performance, PC_thin, PC_long, 
+         syntactic_complexity, AGL_d_grammaticality, AGL_d_chunk_strength) %>%
+  filter(complete.cases(.)) 
+
+legible_names <- c(
+  age                    = "Age",
+  gross_motor_experience = "Gross motor\nExperience",
+  fine_motor_experience  = "Fine motor\nExperience",
+  toolmaking_performance = "Toolmaking\nPerformance",
+  PC_thin                = "PC thin",
+  PC_long                = "PC long",
+  syntactic_complexity   = "Syntactic\nComplexity",
+  AGL_d_grammaticality   = "AGL d'\nGrammaticality",
+  AGL_d_chunk_strength   = "AGL d'\nChunk strength"
+)
+
+names(df) <- unname(legible_names[names(df)])  # rename columns for legibility
+
+ggpairs(
+  df,
+  upper = list(continuous = wrap("cor", method = "pearson", size = 3)),
+  lower = list(continuous = wrap("smooth", method = "lm", se = FALSE, alpha = 0.6, size = 0.3)),
+  diag  = list(continuous = "densityDiag"),
+  title = "Pearson's correlation: behavioral measures (pre-training)"
+)
+
+rm(df)
+
+```
+
+# Lateralization of brain measures
+```{r brain_asymmetry, echo=FALSE, eval=TRUE}
+# stats: for AQ - AF and SLF WM measures 
+#===============================================================================
+df <- data %>% filter(training == 'pre') 
+
+df <- df[,var$AQ_WM_measures]
+
+result_df<-check_normality_and_test(df)
+
+# Compute BH-adjusted p-values
+result_df$adj_q_value <- p.adjust(result_df$p_value, method = "BH")
+
+# Add star for q < 0.25
+result_df$adj_q_value <- ifelse(
+  is.na(result_df$adj_q_value),
+  NA,
+  ifelse(result_df$adj_q_value < 0.25,
+         paste0(sprintf("%.3f", result_df$adj_q_value), " *"),
+         sprintf("%.3f", result_df$adj_q_value))
+)
+
+result_df<-underscore_to_space(result_df)
+
+kable(result_df, digits = 3,
+      format = "html",
+      escape = FALSE,
+      align = c("l","c","c","c","c","c","c","l"),
+      col.names = c("Variable", "n", "W", "p-value",
+                    "Test", "Statistic", "p-value", "BH q-value"),
+      caption = "**Table S3 A.** Asymmetry of AF and SLF II/III white matter tract measures.") %>%
+  add_header_above(c(" " = 2, "normality" = 2, "significance test" = 4), bold = TRUE) %>%
+  kable_styling(bootstrap_options = c("hover", "responsive", "condensed")) %>%
+  kable_classic(full_width = TRUE)
+
+rm(df, result_df)
+
+# Do the same for AQ of AF GM terminations 
+df <- data %>% filter(training == 'pre') 
+
+df <- df[,var$AQ_AF_GM_terminations]
+
+result_df<-check_normality_and_test(df)
+
+# Compute BH-adjusted p-values
+result_df$adj_q_value <- p.adjust(result_df$p_value, method = "BH")
+
+# Add star for q < 0.25
+result_df$adj_q_value <- ifelse(
+  is.na(result_df$adj_q_value),
+  NA,
+  ifelse(result_df$adj_q_value < 0.25,
+         paste0(sprintf("%.3f", result_df$adj_q_value), " *"),
+         sprintf("%.3f", result_df$adj_q_value))
+)
+
+result_df<-underscore_to_space(result_df)
+
+kable(result_df, digits = 3,
+      format = "html",
+      escape = FALSE,
+      align = c("l","c","c","c","c","c","c","l"),
+      col.names = c("Variable", "n", "W", "p-value",
+                    "Test", "Statistic", "p-value", "BH q-value"),
+      caption = "**Table S3 B.** Asymmetry of AF GM temrinations.") %>%
+  add_header_above(c(" " = 2, "normality" = 2, "significance test" = 4), bold = TRUE) %>%
+  kable_styling(bootstrap_options = c("hover", "responsive", "condensed")) %>%
+  kable_classic(full_width = TRUE)
+
+rm(df, result_df)
+
+# Do the same for AQ of SLF II/III GM terminations 
+df <- data %>% filter(training == 'pre') 
+
+df <- df[,var$AQ_SLF_GM_terminations]
+
+result_df<-check_normality_and_test(df)
+
+# Compute BH-adjusted p-values
+result_df$adj_q_value <- p.adjust(result_df$p_value, method = "BH")
+
+# Add star for q < 0.25
+result_df$adj_q_value <- ifelse(
+  is.na(result_df$adj_q_value),
+  NA,
+  ifelse(result_df$adj_q_value < 0.25,
+         paste0(sprintf("%.3f", result_df$adj_q_value), " *"),
+         sprintf("%.3f", result_df$adj_q_value))
+)
+
+result_df<-underscore_to_space(result_df)
+
+kable(result_df, digits = 3,
+      format = "html",
+      escape = FALSE,
+      align = c("l","c","c","c","c","c","c","l"),
+      col.names = c("Variable", "n", "W", "p-value",
+                    "Test", "Statistic", "p-value", "BH q-value"),
+      caption = "**Table S3 C.** Asymmetry of SLF II/III GM terminations.") %>%
+  add_header_above(c(" " = 2, "normality" = 2, "significance test" = 4), bold = TRUE) %>%
+  kable_styling(bootstrap_options = c("hover", "condensed", "responsive")) %>%
+  kable_classic(full_width = TRUE)
+
+rm(df, result_df)
+
+```
+
+# Influence of prior experience on toolmaking performance (pre-training)
+
+## Effect of motor-skill experience
+```{r toolmaking_predictors_motor_experience, echo=FALSE, eval=TRUE}
+df <- data %>%
+  filter(training == "pre") %>%
+  mutate(group = factor(group, levels = c("con", "exp")))
+
+# Variables used for this analysis
+select_variables <- c("group",
+                      "toolmaking_performance",
+                      "gross_motor_experience",
+                      "fine_motor_experience")
+
+df <- df %>%
+  select(all_of(select_variables)) %>%
+  filter(complete.cases(.))
+
+# Baseline motor skill experience model
+lm_toolmaking_motor_experience <- lm(toolmaking_performance ~ gross_motor_experience + fine_motor_experience,
+              data = df)
+
+check_model(lm_toolmaking_motor_experience)
+
+summary(lm_toolmaking_motor_experience)
+
+# Long format for faceting
+df_long <- df %>%
+  pivot_longer(
+    cols = c(gross_motor_experience, fine_motor_experience),
+    names_to = "predictor",
+    values_to = "experience"
+  ) %>%
+  mutate(
+    predictor = factor(
+      predictor,
+      levels = c("gross_motor_experience", "fine_motor_experience"),
+      labels = c("gross motor exp (years)",
+                 "fine motor exp (years)")
+    )
+  )
+
+# Faceted plot (no group separation)
+ggplot(df_long,
+       aes(x = experience,
+           y = toolmaking_performance)) +
+  geom_point(size = 3, alpha = .8) +
+  geom_smooth(method = "lm", se = TRUE, color = "black") +
+  facet_wrap(~ predictor, nrow = 1, scales = "free_x") +
+  labs(x = NULL,
+       y = "toolmaking performance") +
+  theme_classic(base_size = 14)
+
+# Levene's test (for variance check)
+car::leveneTest(toolmaking_performance ~ group, data = df)
+
+# ANCOVA: adjust for gross motor experience and check if there are differences between experimental and control groups
+lm_toolmaking_groups_con_gross <- lm(toolmaking_performance ~ group + gross_motor_experience, data = df)
+summary(lm_toolmaking_groups_con_gross)
+
+# Homogeneity of regression slopes
+#lm_group_gross_interaction <- lm(toolmaking_performance ~ group * gross_motor_experience, data = df)
+#anova(lm_toolmaking_groups_con_gross, lm_group_gross_interaction)
+
+# Quick look at these variables
+df_long <- df %>%
+  pivot_longer(
+    cols = c(gross_motor_experience, fine_motor_experience),
+    names_to = "predictor",
+    values_to = "experience"
+  ) %>%
+  mutate(
+    predictor = factor(
+      predictor,
+      levels = c("gross_motor_experience", "fine_motor_experience"),
+      labels = c("gross motor exp (years)",
+                 "fine motor exp (years)")
+    )
+  )
+
+ggplot(df_long,
+       aes(experience, toolmaking_performance, color = group)) +
+  geom_point(size = 3, alpha = .8) +
+  geom_smooth(method = "lm", se = TRUE) +
+  facet_wrap(~ predictor, nrow = 1, scales = "free_x") +
+  labs(x = NULL, y = "toolmaking performance", color = "group") +
+  theme_classic(base_size = 14) +
+  scale_color_manual(values = c("con" = color$con,"exp" = color$exp))
+
+rm(df, df_long)
+
+```
+
+## Effect of language measures  
+```{r toolmaking_predictors_language, echo=FALSE, eval=TRUE}
+
+df <- data %>%
+  filter(training == "pre") %>%
+  mutate(group = factor(group, levels = c("con", "exp")))
+
+# Variables used for this analysis
+select_variables <- c("group",
+                      "toolmaking_performance",
+                      "syntactic_complexity",
+                      "AGL_d_chunk_strength",
+                      "AGL_d_grammaticality")
+
+df <- df %>%
+  select(all_of(select_variables)) %>%
+  filter(complete.cases(.))
+
+# toolmaking by language task scores
+lm_toolmaking_language <- lm(toolmaking_performance ~ syntactic_complexity + AGL_d_grammaticality + AGL_d_chunk_strength, data = df)
+check_model(lm_toolmaking_language)
+
+summary(lm_toolmaking_language)
+
+# Quick look at these variables
+df_long <- df %>%
+  pivot_longer(
+    cols = c(syntactic_complexity,
+             AGL_d_grammaticality,
+             AGL_d_chunk_strength),
+    names_to = "predictor",
+    values_to = "score"
+  ) %>%
+  mutate(
+    predictor = factor(
+      predictor,
+      levels = c("syntactic_complexity",
+                 "AGL_d_grammaticality",
+                 "AGL_d_chunk_strength"),
+      labels = c("syntactic complexity",
+                 "AGL d' grammaticality",
+                 "AGL d' chunk strength")
+    )
+  )
+
+ggplot(df_long,
+       aes(score, toolmaking_performance, color = group)) +
+  geom_point(size = 3, alpha = .8) +
+  geom_smooth(method = "lm", se = TRUE) +
+  facet_wrap(~ predictor, nrow = 1, scales = "free_x") +
+  labs(x = NULL, y = "toolmaking performance score", color = "group") +
+  theme_classic(base_size = 14) +
+  scale_color_manual(values = c("con" = color$con, "exp" = color$exp))
+
+rm(df, df_long)
+
+```
+
+
+
+# Pre-training partial correlations: toolmaking performance and brain measures
+```{r partial_correlations_pre_training, results='asis', eval=TRUE}
+df <- data %>% dplyr::filter(training == "pre")
+
+toolmaking_performance <- df$toolmaking_performance
+gross_motor_experience <- df$gross_motor_experience
+
+captions <- list(
+  AQ_WM  = "**Table S4 A.** Partial correlations between toolmaking performance and AQ of WM measures (controlling for gross motor experience).",
+  AQ_AF  = "**Table S4 B.** Partial correlations between toolmaking performance and AQ of AF GM terminations (controlling for gross motor experience).",
+  AQ_SLF = "**Table S4 C.** Partial correlations between toolmaking performance and AQ of SLF II/III GM terminations (controlling for gross motor experience).",
+  WM     = "**Table S4 D.** Partial correlations between toolmaking performance and WM measures (controlling for gross motor experience).",
+  AF_L   = "**Table S4 E.** Partial correlations between toolmaking performance and AF left hemisphere GM terminations (controlling for gross motor experience).",
+  AF_R   = "**Table S4 F.** Partial correlations between toolmaking performance and AF right hemisphere GM terminations (controlling for gross motor experience).",
+  SLF_L  = "**Table S4 G.** Partial correlations between toolmaking performance and SLF II/III left hemisphere GM terminations (controlling for gross motor experience).",
+  SLF_R  = "**Table S4 H.** Partial correlations between toolmaking performance and SLF II/III right hemisphere GM terminations (controlling for gross motor experience)."
+)
+
+subtitles <- list(
+  AQ_WM  = "toolmaking x AQ of WM metrics\n(control: gross motor exp)",
+  AQ_AF  = "toolmaking x AQ of AF GM terminations\n(control: gross motor exp)",
+  AQ_SLF = "toolmaking x AQ of SLF II/III GM terminations\n(control: gross motor exp)",
+  WM     = "toolmaking x WM measures\n(control: gross motor exp)",
+  AF_L   = "toolmaking x AF left hemisphere GM terminations\n(control: gross motor exp)",
+  AF_R   = "toolmaking x AF right hemisphere GM terminations\n(control: gross motor exp)",
+  SLF_L  = "toolmaking x SLF II/III left hemisphere GM terminations\n(control: gross motor exp)",
+  SLF_R  = "toolmaking x SLF II/III right hemisphere GM terminations\n(control: gross motor exp)"
+)
+
+
+results_pcorr_tool_brain_PRE_training <- list()
+
+for (fam in names(brain_families)) {
+
+  pcorr <- calculate_toolmaking_brain_pcorr(
+    toolmaking_performance,
+    df[, brain_families[[fam]], drop = FALSE],
+    gross_motor_experience
+  )
+
+  results_pcorr_tool_brain_PRE_training[[fam]] <- pcorr
+
+  print(table_toolmaking_brain_pcorr(
+    pcorr,
+    caption = captions[[fam]]
+  ))
+
+  print(plot_toolmaking_brain_heatmap(
+    pcorr,
+    title = "Partial correlation",
+    subtitle = subtitles[[fam]],
+    filename = paste0("figures/pcorr_heatmap_toolmaking_", fam, ".png")
+  ))
+}
+
+rm(df)
+
+
+```
+
+# Language aptitude (syntactic complexity) and brain correlations
+```{r language_brain_correlations, results='asis', eval=TRUE}
+# Pre-training subset and language predictor
+df <- data %>% dplyr::filter(training == "pre")
+
+language_measures = c("syntactic_complexity")
+
+captions <- list(
+  AQ_WM  = "**Table S5 A.** Correlation: language aptitude × AQ of WM measures",
+  AQ_AF  = "**Table S5 B.** Correlation: language aptitude × AQ of AF GM terminations",
+  AQ_SLF = "**Table S5 C.** Correlation: language aptitude × AQ of SLF II/III GM terminations",
+  WM     = "**Table S5 D.** Correlation: language aptitude × WM measures",
+  AF_L   = "**Table S5 E.** Correlation: language aptitude × AF left GM terminations",
+  AF_R   = "**Table S5 F.** Correlation: language aptitude × AF right GM terminations",
+  SLF_L  = "**Table S5 G.** Correlation: language aptitude × SLF II/III left GM terminations",
+  SLF_R  = "**Table S5 H.** Correlation: language aptitude × SLF II/III right GM terminations"
+)
+
+subtitles <- list(
+  AQ_WM  = "language aptitude × AQ of WM metrics (PRE)\n(BH q < 0.25 marked *)",
+  AQ_AF  = "language aptitude × AQ of AF GM terminations (PRE)\n(BH q < 0.25 marked *)",
+  AQ_SLF = "language aptitude × AQ of SLF II/III GM terminations (PRE)\n(BH q < 0.25 marked *)",
+  WM     = "language aptitude × WM measures (PRE)\n(BH q < 0.25 marked *)",
+  AF_L   = "language aptitude × AF left GM terminations (PRE)\n(BH q < 0.25 marked *)",
+  AF_R   = "language aptitude × AF right GM terminations (PRE)\n(BH q < 0.25 marked *)",
+  SLF_L  = "language aptitude × SLF II/III left GM terminations (PRE)\n(BH q < 0.25 marked *)",
+  SLF_R  = "language aptitude × SLF II/III right GM terminations (PRE)\n(BH q < 0.25 marked *)"
+)
+
+corr_results <- list()
+
+for (fam in names(brain_families)) {
+
+  corr_results[[fam]] <- calculate_language_brain_corr(
+    df,
+    language_vars = language_measures,
+    brain_vars = brain_families[[fam]]
+  )
+
+  print(table_language_brain_corr(
+    corr_results[[fam]],
+    language_headers = c("Syntactic Complexity"),
+    caption = captions[[fam]]
+  ))
+
+  print(plot_language_brain_heatmap(
+    corr_results[[fam]],
+    title = "Correlation",
+    subtitle = subtitles[[fam]],
+    filename = paste0("figures/corr_heatmap_language_", fam, ".png")
+  ))
+}
+
+rm(df)
+
+```
+
+# AGL scores (grammaticality and chunk strength) and brain correlations
+```{r agl_brain_correlations, results='asis', eval=TRUE}
+# Pre-training subset and language predictor
+df <- data %>% dplyr::filter(training == "pre")
+
+agl_measures = c("AGL_d_grammaticality", "AGL_d_chunk_strength")
+
+captions <- list(
+  AQ_WM  = "**Table S6 A.** Correlation: AGL scores × AQ of WM measures",
+  AQ_AF  = "**Table S6 B.** Correlation: AGL scores × AQ of AF GM terminations",
+  AQ_SLF = "**Table S6 C.** Correlation: AGL scores × AQ of SLF II/III GM terminations",
+  WM     = "**Table S6 D.** Correlation: AGL scores × WM measures",
+  AF_L   = "**Table S6 E.** Correlation: AGL scores × AF left GM terminations",
+  AF_R   = "**Table S6 F.** Correlation: AGL scores × AF right GM terminations",
+  SLF_L  = "**Table S6 G.** Correlation: AGL scores × SLF II/III left GM terminations",
+  SLF_R  = "**Table S6 H.** Correlation: AGL scores × SLF II/III right GM terminations"
+)
+
+subtitles <- list(
+  AQ_WM  = "AGL scores × AQ of WM metrics (PRE)\n(BH q < 0.25 marked *)",
+  AQ_AF  = "AGL scores × AQ of AF GM terminations (PRE)\n(BH q < 0.25 marked *)",
+  AQ_SLF = "AGL scores × AQ of SLF II/III GM terminations (PRE)\n(BH q < 0.25 marked *)",
+  WM     = "AGL scores × WM measures (PRE)\n(BH q < 0.25 marked *)",
+  AF_L   = "AGL scores × AF left GM terminations (PRE)\n(BH q < 0.25 marked *)",
+  AF_R   = "AGL scores × AF right GM terminations (PRE)\n(BH q < 0.25 marked *)",
+  SLF_L  = "AGL scores × SLF II/III left GM terminations (PRE)\n(BH q < 0.25 marked *)",
+  SLF_R  = "AGL scores × SLF II/III right GM terminations (PRE)\n(BH q < 0.25 marked *)"
+)
+
+agl_corr_results <- list()
+
+for (fam in names(brain_families)) {
+
+  agl_corr_results[[fam]] <- calculate_language_brain_corr(
+    df,
+    language_vars = agl_measures,
+    brain_vars = brain_families[[fam]]
+  )
+
+  print(table_language_brain_corr(
+    agl_corr_results[[fam]],
+    language_headers = c("AGL d' grammaticality", "AGL d' chunk strength"),
+    caption = captions[[fam]]
+  ))
+
+  print(plot_language_brain_heatmap(
+    agl_corr_results[[fam]],
+    title = "Correlation",
+    subtitle = subtitles[[fam]],
+    filename = paste0("figures/corr_heatmap_agl_", fam, ".png")
+  ))
+}
+
+rm(df)
+
+```
+# Mixed-design ANOVA for training effects
+```{r mixed_design_anova, results='asis', eval=TRUE}
+# Mixed-design ANOVA by family
+
+# Captions (match names above)
+anova_captions <- list(
+  AQ_WM  = "**Table S7 A.** Mixed design ANOVA for AQ WM measures.",
+  AQ_AF  = "**Table S7 B.** Mixed design ANOVA for AQ of AF GM terminations.",
+  AQ_SLF = "**Table S7 C.** Mixed design ANOVA for AQ of SLF II/III GM terminations.",
+  WM     = "**Table S7 D.** Mixed design ANOVA for WM measures.",
+  AF_L   = "**Table S7 E.** Mixed design ANOVA for AF left GM terminations.",
+  AF_R   = "**Table S7 F.** Mixed design ANOVA for AF right GM terminations.",
+  SLF_L  = "**Table S7 G.** Mixed design ANOVA for SLF II/III left GM terminations.",
+  SLF_R  = "**Table S7 H.** Mixed design ANOVA for SLF II/III right GM terminations."
+)
+
+# Run + store
+results_mixed_anova <- list()
+
+for (fam in names(brain_families)) {
+  results_mixed_anova[[fam]] <- run_mixed_design_anova(data, brain_families[[fam]])
+
+  # print table in Rmd
+  print(table_anova_results(results_mixed_anova[[fam]], caption = anova_captions[[fam]]))
+}
+
+```
+
+## Post-hoc analyses after ANOVA
+```{r followup_analysis_anova, results='asis', eval=TRUE}
+
+run_followup <- c("AQ_AF_averageFA", "AF_L_STG", "AF_L_MTG", "AQ_SLF_BA44", "SLF_L_BA44")
+
+plots_delta    <- list()
+res_deltas     <- list()
+
+for (measure in run_followup) {
+
+  # 1) Delta analysis
+  res_delta <- anova_followup_delta(data, measure)
+  res_deltas[[measure]] <- res_delta
+
+  # 2) Delta plot
+  p_delta <- anova_followup_delta_plot(
+    res_delta,
+    title   = paste0(measure, ": change score"),
+    y_label = paste0("\u0394 ", measure, " (post \u2212 pre)"),
+    filename = paste0("figures/anova_delta_plot_", measure, ".png")
+  )
+  plots_delta[[measure]] <- p_delta
+  print(p_delta)
+
+  # 3) Detailed / interaction plot
+  p_detailed <- anova_followup_detailed_plot(
+    data,
+    measure,
+    title = paste0(measure, ": interaction"),
+    filename = paste0("figures/anova_detailed_plot_", measure, ".png")
+  )
+  print(p_detailed)
+}
+
+
+```
+
+# Pre-post training changes in correlations
+
+```{r prepost_correlation_changes, results='asis', eval=TRUE}
+df <- data %>% dplyr::filter(group == "exp")
+
+prepost_captions <- list(
+  AQ_WM  = "**Table S8 A.** Pre–post change in partial correlations (controlling gross motor experience) for AQ WM measures.",
+  AQ_AF  = "**Table S8 B.** Pre–post change in partial correlations (controlling gross motor experience) for AQ AF GM terminations.",
+  AQ_SLF = "**Table S8 C.** Pre–post change in partial correlations (controlling gross motor experience) for AQ SLF II/III GM terminations.",
+  WM     = "**Table S8 D.** Pre–post change in partial correlations (controlling gross motor experience) for WM measures.",
+  AF_L   = "**Table S8 E.** Pre–post change in partial correlations (controlling gross motor experience) for AF left GM terminations.",
+  AF_R   = "**Table S8 F.** Pre–post change in partial correlations (controlling gross motor experience) for AF right GM terminations.",
+  SLF_L  = "**Table S8 G.** Pre–post change in partial correlations (controlling gross motor experience) for SLF II/III left GM terminations.",
+  SLF_R  = "**Table S8 H.** Pre–post change in partial correlations (controlling gross motor experience) for SLF II/III right GM terminations."
+)
+
+results_EXP_toolmaking_prepost_pcorr_change <- list()
+
+for (fam in names(brain_families)) {
+
+  family_vars <- as.character(brain_families[[fam]])
+  family_vars <- family_vars[family_vars %in% names(df)]  # keep only existing columns
+
+  # 1) ANALYSIS
+  res_raw <- partial_prepost_compare(
+    df        = df,
+    measures  = family_vars,
+    xvar      = "toolmaking_performance",
+    control   = "gross_motor_experience",
+    time      = "training",
+    pre_level = "pre",
+    post_level = "post"
+  )
+
+  # 2) TABLE: compute columns + FORCE ORDER to match family_vars
+  res_tab <- res_raw %>%
+    dplyr::mutate(
+      family = fam,
+      p_adj = p.adjust(p, method = "BH"),
+      sig   = !is.na(p_adj) & p_adj < 0.25,
+      delta_r = post_r - pre_r,
+      dir   = dplyr::if_else(delta_r >= 0, "Increase", "Decrease")
+    ) %>%
+    dplyr::mutate(
+      variable = factor(variable, levels = family_vars),
+      variable_label = factor(gsub("_", " ", variable),
+                              levels = gsub("_", " ", family_vars))
+    ) %>%
+    dplyr::arrange(variable) %>%   # factor order (family order)
+    dplyr::mutate(
+      variable = as.character(variable)  # optional: keep printing nicer in tables
+    )
+
+  results_EXP_toolmaking_prepost_pcorr_change[[fam]] <- res_tab
+
+  # Print table (order preserved; no sorting)
+  print(table_prepost_pcorr_changes(res_tab, caption = prepost_captions[[fam]]))
+
+  # 3) PLOT (order preserved via factor levels)
+  p <- plot_prepost_pcorr_change_as_arrows(
+    df_family = res_tab,
+    title_prefix = "Pre-Post Correlation Changes:",
+    subtitle = paste0("Arrows show direction of change; * q< 0.25 (BH)")
+  )
+  print(p)
+
+  # Optional save
+  ggplot2::ggsave(
+    filename = paste0("figures/change_correlations_", fam, ".png"),
+    plot = p, width = 10, height = 8, dpi = 300, device = "png"
+  )
+}
+
+save(results_EXP_toolmaking_prepost_pcorr_change, file = here("results", "RData", "results_EXP_toolmaking_prepost_pcorr_change.RData"))
+
+```
+
+
+# Handaxe morphology 
+
+## Check if we need to control for gross-motor experience
+```{r does_motor_experience_predict_pca_pre_toolmaking, results='asis', echo=FALSE, warning=FALSE, eval=TRUE}
+# Filter pre-training data only
+df <- data %>% filter(training == "pre")
+
+# Linear models: predicting PC_thin and PC_long from gross and fine motor experience
+model_PC_thin <- lm(PC_thin ~ gross_motor_experience + fine_motor_experience, data = df)
+check_model(model_PC_thin)
+print(summary(model_PC_thin))
+
+
+model_PC_long <- lm(PC_long ~ gross_motor_experience + fine_motor_experience, data = df)
+check_model(model_PC_long)
+print(summary(model_PC_long))
+
+df_long <- df %>%
+  dplyr::select(gross_motor_experience, fine_motor_experience, PC_thin, PC_long) %>%
+  pivot_longer(
+    cols = c(gross_motor_experience, fine_motor_experience),
+    names_to = "motor_type",
+    values_to = "motor_years"
+  ) %>%
+  pivot_longer(
+    cols = c(PC_thin, PC_long),
+    names_to = "pc_type",
+    values_to = "pc_score"
+  ) %>%
+  mutate(
+    motor_type = dplyr::recode(motor_type,
+                        gross_motor_experience = "gross motor experience",
+                        fine_motor_experience  = "fine motor experience"),
+    pc_type = dplyr::recode(pc_type,
+                     PC_thin = "PC thin",
+                     PC_long = "PC long")
+  )
+
+p <- ggplot(df_long, aes(x = motor_years, y = pc_score)) +
+  geom_point(size = 2, alpha = .8) +
+  geom_smooth(method = "lm", se = TRUE) +
+  facet_grid(pc_type ~ motor_type, scales = "free_y") +
+  theme_classic(base_size = 14) +
+  labs(x = "motor skill experience (years)", y = "")
+print(p)
+
+ggplot2::ggsave(
+    filename = "figures/motor_exp_influence_on_morphology_PCA.png",
+    plot = p, width = 10, height = 8, dpi = 300, device = "png"
+  )
+
+```
+
+## run analysis
+```{r corr_morphology_brain_PRE, results='asis', echo=FALSE, warning=FALSE, eval=TRUE}
+df <- data %>% dplyr::filter(training == "pre")
+
+pca_measures <- c("PC_thin", "PC_long")
+
+captions_pca <- list(
+  AQ_WM  = "**Table S9.A.** Correlation: PCA components × AQ of WM measures (PRE)",
+  AQ_AF  = "**Table S9.B.** Correlation: PCA components × AQ of AF GM terminations (PRE)",
+  AQ_SLF = "**Table S9.C.** Correlation: PCA components × AQ of SLF II/III GM terminations (PRE)",
+  WM     = "**Table S9.D.** Correlation: PCA components × WM measures (PRE)",
+  AF_L   = "**Table S9.E.** Correlation: PCA components × AF left GM terminations (PRE)",
+  AF_R   = "**Table S9.F.** Correlation: PCA components × AF right GM terminations (PRE)",
+  SLF_L  = "**Table S9.G.** Correlation: PCA components × SLF II/III left GM terminations (PRE)",
+  SLF_R  = "**Table S9.H.** Correlation: PCA components × SLF II/III right GM terminations (PRE)"
+)
+
+subtitles_pca <- list(
+  AQ_WM  = "PCA components × AQ of WM metrics (PRE)\n(BH q < 0.25 marked *)",
+  AQ_AF  = "PCA components × AQ of AF GM terminations (PRE)\n(BH q < 0.25 marked *)",
+  AQ_SLF = "PCA components × AQ of SLF II/III GM terminations (PRE)\n(BH q < 0.25 marked *)",
+  WM     = "PCA components × WM measures (PRE)\n(BH q < 0.25 marked *)",
+  AF_L   = "PCA components × AF left GM terminations (PRE)\n(BH q < 0.25 marked *)",
+  AF_R   = "PCA components × AF right GM terminations (PRE)\n(BH q < 0.25 marked *)",
+  SLF_L  = "PCA components × SLF II/III left GM terminations (PRE)\n(BH q < 0.25 marked *)",
+  SLF_R  = "PCA components × SLF II/III right GM terminations (PRE)\n(BH q < 0.25 marked *)"
+)
+
+corr_results_pca <- list()
+
+for (fam in names(brain_families)) {
+
+  corr_results_pca[[fam]] <- calculate_pca_brain_corr(
+    df,
+    pca_vars = pca_measures,
+    brain_vars = brain_families[[fam]]
+  )
+
+  print(table_pca_brain_corr(
+    corr_results_pca[[fam]],
+    caption = captions_pca[[fam]],
+    q_star = 0.25,
+    brain_order = brain_families[[fam]],
+    pca_order = pca_measures
+  ))
+
+  print(plot_pca_brain_heatmap(
+    corr_results_pca[[fam]],
+    title = "Correlation",
+    subtitle = subtitles_pca[[fam]],
+    q_star = 0.25,
+    brain_order = brain_families[[fam]],
+    pca_order = pca_measures,
+    filename = paste0("figures/corr_heatmap_toolmaking_PCA_", fam, ".png")
+  ))
+}
+
+rm(df)
+
+```
+
+
+# Change in PCA-brain correlations 
+
+```{r corr_morphology_change_exp, results='asis', echo=FALSE, warning=FALSE, eval=TRUE}
+#===============================================================================
+# EXP group: pre–post change in PCA × brain associations (table + arrow plot)
+#===============================================================================
+
+df_exp <- data %>% dplyr::filter(group == "exp")
+
+pca_measures <- c("PC_thin", "PC_long")
+
+# ---- Table/plot text scheme (match your PRE style) ----
+captions_pca_change <- list(
+  AQ_WM  = "**Table S10.A.** Pre–post change: PCA components × AQ of WM measures (EXP)",
+  AQ_AF  = "**Table S10.B.** Pre–post change: PCA components × AQ of AF GM terminations (EXP)",
+  AQ_SLF = "**Table S10.C.** Pre–post change: PCA components × AQ of SLF II/III GM terminations (EXP)",
+  WM     = "**Table S10.D.** Pre–post change: PCA components × WM measures (EXP)",
+  AF_L   = "**Table S10.E.** Pre–post change: PCA components × AF left GM terminations (EXP)",
+  AF_R   = "**Table S10.F.** Pre–post change: PCA components × AF right GM terminations (EXP)",
+  SLF_L  = "**Table S10.G.** Pre–post change: PCA components × SLF II/III left GM terminations (EXP)",
+  SLF_R  = "**Table S10.H.** Pre–post change: PCA components × SLF II/III right GM terminations (EXP)"
+)
+
+subtitles_pca_change <- list(
+  AQ_WM  = "Pre–post change in PCA components × AQ of WM metrics (EXP)\n(BH q < 0.25 marked *)",
+  AQ_AF  = "Pre–post change in PCA components × AQ of AF GM terminations (EXP)\n(BH q < 0.25 marked *)",
+  AQ_SLF = "Pre–post change in PCA components × AQ of SLF II/III GM terminations (EXP)\n(BH q < 0.25 marked *)",
+  WM     = "Pre–post change in PCA components × WM measures (EXP)\n(BH q < 0.25 marked *)",
+  AF_L   = "Pre–post change in PCA components × AF left GM terminations (EXP)\n(BH q < 0.25 marked *)",
+  AF_R   = "Pre–post change in PCA components × AF right GM terminations (EXP)\n(BH q < 0.25 marked *)",
+  SLF_L  = "Pre–post change in PCA components × SLF II/III left GM terminations (EXP)\n(BH q < 0.25 marked *)",
+  SLF_R  = "Pre–post change in PCA components × SLF II/III right GM terminations (EXP)\n(BH q < 0.25 marked *)"
+)
+
+# run all families once
+tidy_all <- run_pca_families_prepost(df_exp, brain_families, pca_vars = pca_measures)
+
+for (fam in names(brain_families)) {
+
+  tidy_fam <- tidy_all %>% dplyr::filter(family == fam)
+
+  # keep your family variable order
+  ord <- as.character(brain_families[[fam]])
+  ord <- ord[ord %in% tidy_fam$variable]
+
+  tidy_fam <- tidy_fam %>%
+    dplyr::mutate(variable = factor(variable, levels = ord)) %>%
+    dplyr::arrange(variable)
+
+  #-----------------------
+  # TABLE (wide by PC)
+  #-----------------------
+  wide <- pca_prepost_as_wide_by_pc(tidy_fam, pc_order = pca_measures)
+
+  print(
+    print_pca_prepost_wide_table(
+      wide,
+      caption = captions_pca_change[[fam]] %||% paste0("Pre–post change: ", fam),
+      q_star  = 0.25
+    )
+  )
+
+  #-----------------------
+  # PLOT (weighted arrows)
+  #-----------------------
+  tidy_plot <- tidy_fam %>% dplyr::mutate(variable = as.character(variable))
+
+  p <- plot_family_dumbbell_dir_facet(
+    tidy_plot,
+    family_label   = fam,
+    order_vec      = ord,
+    facet_families = FALSE,
+    title          = "Pre–post change in PCs–brain measure association (Δr)",
+    subtitle       = subtitles_pca_change[[fam]] %||% paste0("(", fam, ")\n(BH q < 0.25 marked *)"),
+    filename = paste0("figures/pre-post_toolmaking_PCA_", fam, ".png")
+  )
+
+  print(p)
+}
+
+rm(df_exp)
+```
+
+# pre-post change in behavior
+```{r plot_prepost_changes, echo=FALSE, warning=FALSE, results='asis', eval=TRUE}
+# Plot pre-post changes for experimental group
+measures_to_plot <- c("PC_thin", "PC_long")
+prepost_plot <- plot_prepost_change_raincloud(
+  data = data,
+  measures = measures_to_plot,
+  title = "Effect of training"
+)
+prepost_plot
+ggsave(here("results", "figures", "prepost_PCA_training_changes.png"), plot = prepost_plot, width = 8, height = 6, dpi = 300)
+
+
+measures_to_plot <- c("toolmaking_performance")
+prepost_plot_tool <- plot_prepost_change_raincloud(
+  data = data,
+  measures = measures_to_plot,
+  title = "Effect of training"
+)
+
+prepost_plot_tool
+ggsave(here("results", "figures", "prepost_toolmaking_training_changes.png"), plot = prepost_plot_tool, width = 6, height = 8, dpi = 300)
+
+measures_to_plot <- c("syntactic_complexity")
+prepost_plot_syntax <- plot_prepost_change_raincloud(
+  data = data,
+  measures = measures_to_plot,
+  title = "Effect of training"
+)
+
+prepost_plot_syntax
+ggsave(here("results", "figures", "prepost_syntactic_complexity_training_changes.png"), plot = prepost_plot_syntax, width = 6, height = 8, dpi = 300)
+
+
+df_wide <- data %>%
+  filter(group == "exp") %>%
+  select(subject, training, toolmaking_performance, syntactic_complexity) %>%
+  pivot_wider(names_from = training,
+              values_from = c(toolmaking_performance, syntactic_complexity)) %>%
+  mutate(
+    delta_tool  = toolmaking_performance_post - toolmaking_performance_pre,
+    delta_syntax = syntactic_complexity_post - syntactic_complexity_pre
+  )
+
+df_delta <- df_wide %>%
+  filter(!is.na(delta_tool), !is.na(delta_syntax))
+
+cor_test <- cor.test(df_delta$delta_tool, df_delta$delta_syntax, method = "pearson")
+
+prepost_plot_delta <- ggplot(df_delta, aes(x = delta_tool, y = delta_syntax)) +
+  geom_point(size = 2.2, shape = 25, fill = "gray20", color = "gray20", alpha = 0.9) +
+  geom_smooth(method = "lm",
+              color = color$exp,
+              fill  = color$con,
+              se = TRUE,
+              linewidth = 1.1,
+              alpha = 0.35) +
+  annotate(
+    "text",
+    x = -Inf, y = Inf,
+    hjust = -0.05, vjust = 1.10,
+    size = 4.5,
+    label = sprintf("Pearson r(%d) = %.2f,\np = %s, n = %d",
+                    cor_test$parameter,
+                    unname(cor_test$estimate),
+                    formatC(cor_test$p.value, format = "g", digits = 3),
+                    nrow(df_delta))
+  ) +
+  
+  labs(
+    x = expression(Delta~"toolmaking (post - pre)"),
+    y = expression(Delta~"syntactic complexity (post - pre)"),
+    title = "No evidence of behavior transfer"
+  ) +
+  
+  theme_classic(base_size = 14) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(face = "plain")
+  )
+prepost_plot_delta
+
+# for patchwork : to combine subplots
+layout <- "
+ABCC
+"
+
+combined_transfer <- wrap_plots(prepost_plot_tool, prepost_plot_syntax, prepost_plot_delta, design = layout) +
+  plot_annotation(tag_levels = list(c("A", "B", "C"))) &
+  theme(
+    plot.tag = element_text(size = 14, face = "bold")
+  )
+
+combined_transfer
+
+ggsave(
+  filename = here("results", "figures", "behavior_and_transfer.png"),
+  plot = combined_transfer, width = 14, height = 6, dpi = 300, device = "png",
+  create.dir = TRUE
+)
+
+```

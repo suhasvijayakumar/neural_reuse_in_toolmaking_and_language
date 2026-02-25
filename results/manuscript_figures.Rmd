@@ -1,0 +1,624 @@
+---
+title: "Figures for the manuscript"
+author: "Suhas Vijayakumar"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, include = TRUE)
+
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load("here")
+
+here::i_am("results/results.Rmd")
+source(here("code/load_dependencies.R"))
+source(here("code/preprocess_data.R"))
+source(here("code/analysis_functions.R"))
+source(here("code/plotting_functions.R"))
+source(here("code/table_functions.R"))
+
+ifelse(!dir.exists(here("results", "manuscript_figures")),
+        dir.create(here("results", "manuscript_figures")),
+        "Found directory for manuscript figures, continuing without creating.")
+```
+
+```{r dependency_functions}
+# to read any images (PNG, SVG) and return a true ggplot object
+read_as_plot <- function(path) {
+  img   <- magick::image_read(path)
+  grob  <- grid::rasterGrob(as.raster(img), width = unit(1, "npc"), height = unit(1, "npc"))
+  ggplotify::as.ggplot(grob)
+}
+
+```
+
+Quick note: 
+Images may not render with their original width and height in the html output. Please refer to individual saved pdf of images at `results/manuscript_figures` folder. 
+
+## Main text figure - 01: 
+Figure 1. Structural reconstruction and lateralization of the AF. A. Group-level tractography reconstruction of AF (top), and cortical gray matter masks used to reconstruct AF and to calculate gray matter termination metrics (bottom). B. Asymmetry Quotients (AQ) of AF white matter (WM) tract metrics. C. Asymmetry Quotients of GM terminations of AF. Crosshair=mean, error bar=SEM, BA45=Brodmann Area 45, BA44=Brodmann Area 44, PMv=ventral Premotor, TP=Temporal Pole, ITG=Inferior Temporal Gyrus, MTG=Middle Temporal Gyrus, STG=Superior Temporal Gyrus. 
+```{r fig_01}
+
+df <- data %>% filter(training == "pre")
+
+# AF WM (2 measures)
+af_wm_vars   <- c("AQ_AF_averageFA", "AQ_AF_volumeWM")
+af_wm_labels <- c("average FA", "WM volume")
+
+af_wm_long <- pivot_AQ_long(df, af_wm_vars, af_wm_labels, out_name = "measure")
+
+AQ_AF_WM_plot <- plot_AQ(
+  dflong  = af_wm_long,
+  x_var   = "measure",
+  title   = "AQ of AF tract metrics",
+  fill_color= color$AF,
+  y_lim   = c(-2.1, 2.1)
+)
+
+# AF GM (7 ROIs)
+af_gm_vars   <- var$AQ_AF_GM_terminations
+af_gm_labels <- roi_order$AF
+
+af_gm_long <- pivot_AQ_long(df, af_gm_vars, af_gm_labels, out_name = "roi")
+
+AQ_AF_GM_plot <- plot_AQ(
+  dflong  = af_gm_long,
+  x_var   = "roi",
+  title   = "AQ of AF terminations in GM",
+  fill_color= color$AF,
+  y_lim   = c(-2.1, 2.1)
+)
+
+
+AF_tract_ROI <- read_as_plot(here("results", "import", "WM_ROI_AF.png"))
+
+# for patchwork : to combine subplots
+layout <- "
+AAABB
+AAACC
+AAACC
+"
+combined_AF <- wrap_plots(AF_tract_ROI, AQ_AF_WM_plot, AQ_AF_GM_plot, design = layout) +
+  plot_annotation(tag_levels = list(c("A", "B", "C"))) &
+  theme(
+    plot.tag = element_text(size = 14, face = "bold") 
+  )
+
+combined_AF
+
+ggsave(
+  filename = here("results", "manuscript_figures", "fig-01_AF_panel.pdf"),
+  plot = combined_AF, width = 12, height = 5, dpi = 300, device = "pdf",
+  create.dir = TRUE
+)
+
+rm(df)
+```
+
+
+## Main text figure - 02:
+Figure 2. Structural reconstruction and lateralization of the SLF II/III. A. Group-level tractography reconstruction of SLF II/III (top), cortical gray matter masks used to reconstruct SLF II/III and to calculate gray matter termination metrics (bottom). B. Asymmetry Quotients (AQ) of SLF II/III white matter (WM) tract metrics. C. Asymmetry Quotients of GM terminations of SLF II/III. Crosshair=mean, error bar=SEM, BA45=Brodmann Area 45, BA44=Brodmann Area 44, PMv=ventral Premotor, SPL=Superior Parietal Lobule, SMG=Supramarginal Gyrus, AG=Angular Gyrus. 
+
+```{r fig_02}
+
+df <- data %>% filter(training == "pre")
+
+# SLF WM (2 measures)
+slf_wm_vars   <- c("AQ_SLF_averageFA", "AQ_SLF_volumeWM")
+slf_wm_labels <- c("average FA", "WM volume")
+
+slf_wm_long <- pivot_AQ_long(df, slf_wm_vars, slf_wm_labels, out_name = "measure")
+
+AQ_SLF_WM_plot <- plot_AQ(
+  dflong  = slf_wm_long,
+  x_var   = "measure",
+  title   = "AQ of SLF II/III tract metrics",
+  fill_color= color$SLF,
+  y_lim   = c(-2.1, 2.1)
+)
+
+# SLF GM (6 ROIs)
+slf_gm_vars   <- var$AQ_SLF_GM_terminations
+slf_gm_labels <- roi_order$SLF
+
+slf_gm_long <- pivot_AQ_long(df, slf_gm_vars, slf_gm_labels, out_name = "roi")
+
+AQ_SLF_GM_plot <- plot_AQ(
+  dflong  = slf_gm_long,
+  x_var   = "roi",
+  title   = "AQ of SLF II/III terminations in GM",
+  fill_color= color$SLF,
+  y_lim   = c(-2.1, 2.1)
+)
+
+SLF_tract_ROI       <- read_as_plot(here("results", "import", "WM_ROI_SLF.png"))
+
+# for patchwork : to combine subplots
+layout <- "
+AAABB
+AAACC
+AAACC
+"
+
+combined_SLF <- wrap_plots(SLF_tract_ROI, AQ_SLF_WM_plot, AQ_SLF_GM_plot, design = layout) +
+  plot_annotation(tag_levels = list(c("A", "B", "C"))) &
+  theme(
+    plot.tag = element_text(size = 14, face = "bold")  # adjust size as needed
+  )
+
+combined_SLF
+
+ggsave(
+  filename = here("results", "manuscript_figures", "fig-02_SLF_panel.pdf"),
+  plot = combined_SLF, width = 12, height = 5, dpi = 300, device = "pdf",
+  create.dir = TRUE
+)
+
+rm(df)
+```
+
+
+## Main text figure - 03:
+Figure 3. Training-related changes (Δ post-pre) in AF and SLF II/III terminations between experimental and control groups. A. AQ of AF average FA. B. AF terminations in left STG. C. AF terminations in left MTG. D. AQ of SLF II/III BA44 terminations. E. SLF II/III terminations in left BA44. Bars show mean change (Δ post - pre) ± SEM; individual participant data are overlaid in gray dots (control group) and triangles (experimental group), and between-group changes were tested using Welch’s t-tests. Note: vertical axes differ across panels.
+```{r fig_03}
+
+make_my_delta_plot <- function(res_delta,
+                                      title = "Change score (post − pre)",
+                                      subtitle = NULL,
+                                      x_label = "",
+                                      y_label = "Delta (post − pre)",
+                                      filename = NULL,
+                                      width = 6,
+                                      height = 4,
+                                      use_color = color$exp) {
+  
+  df <- res_delta$delta_df
+  if (!("group" %in% names(df)) || !("delta" %in% names(df))) {
+    stop("res_delta must come from anova_followup_delta() and contain delta_df with columns: group, delta.")
+  }
+  
+  # Pull p-value for subtitle (optional)
+  if (is.null(subtitle) && !is.null(res_delta$t_delta)) {
+    pval <- res_delta$t_delta$p.value
+    subtitle <- paste0("(p = ", sprintf("%.3f", pval),")")
+  }
+  
+  df$group <- factor(df$group)
+  
+  p <- ggplot2::ggplot(df, ggplot2::aes(x = group, y = delta)) +
+    
+    # Mean bar
+    ggplot2::stat_summary(
+      ggplot2::aes(fill = group),
+      fun = mean,
+      geom = "bar",
+      width = 0.3,
+      alpha = 0.8
+    ) +
+    
+    # Mean ± SE
+    ggplot2::stat_summary(
+      fun.data = ggplot2::mean_se,
+      geom = "errorbar",
+      width = 0.15,
+      linewidth = 0.4
+    ) +
+    
+    # Individual data points
+    ggplot2::geom_point(
+      ggplot2::aes(fill = group, shape = group),
+      size = 2.8,
+      alpha = 0.9,
+      position = ggplot2::position_jitter(width = 0.08, height = 0),
+      color = "black",
+      stroke = 0.1
+    ) +
+    
+    # Zero reference line
+    ggplot2::geom_hline(yintercept = 0, color = "grey70", linewidth = 0.3) +
+    
+    # Manual scales
+    ggplot2::scale_fill_manual(values = c(
+      "exp" = use_color,
+      "con" = color$con
+    )) +
+    ggplot2::scale_shape_manual(values = c(
+      "exp" = 25,  # filled inverted triangle
+      "con" = 21   # filled circle
+    )) +
+    
+    ggplot2::labs(title = bquote(Delta~.(gsub("_", " ", title))),
+                  subtitle = subtitle,
+                  x = x_label,
+                  y = gsub("_", " ", y_label)
+                  ) +
+    
+    ggplot2::theme_classic(base_size = 12) +
+    ggplot2::theme(
+      panel.grid.major.x = ggplot2::element_blank(),
+      axis.text.x = ggplot2::element_text(),
+      legend.position = "none"
+    )
+  p
+}
+
+run_followup <- c("AQ_AF_averageFA", "AF_L_STG", "AF_L_MTG") 
+
+plots_delta_AF    <- list()
+
+for (measure in run_followup) {
+
+  res_delta <- anova_followup_delta(data, measure)
+
+  p_delta <- make_my_delta_plot(
+    res_delta,
+    title   = paste0(measure),
+    y_label = "(post - pre)",
+    use_color = color$AF
+  )
+  plots_delta_AF[[measure]] <- p_delta
+
+}
+
+run_followup <- c("AQ_SLF_BA44", "SLF_L_BA44")
+
+plots_delta_SLF    <- list()
+
+for (measure in run_followup) {
+
+  res_delta <- anova_followup_delta(data, measure)
+
+  p_delta <- make_my_delta_plot(
+    res_delta,
+    title   = paste0(measure),
+    y_label = "(post - pre)",
+    use_color = color$SLF
+  )
+  plots_delta_SLF[[measure]] <- p_delta
+}
+
+# for patchwork : to combine subplots
+layout <- "
+AABBCC
+DDEEFF
+"
+
+layout <- "
+ABCDE
+"
+
+
+combined_delta <- wrap_plots(plots_delta_AF$AQ_AF_averageFA, plots_delta_AF$AF_L_STG, plots_delta_AF$AF_L_MTG, plots_delta_SLF$AQ_SLF_BA44, plots_delta_SLF$SLF_L_BA44, design = layout) +
+  plot_annotation(tag_levels = list(c("A", "B", "C", "D", "E"))) &
+  theme(
+    plot.tag = element_text(size = 14, face = "bold")  # adjust size as needed
+  )
+
+combined_delta
+
+ggsave(
+  filename = here("results", "manuscript_figures", "fig-03_anova_delta.pdf"),
+  plot = combined_delta, width = 12, height = 4, dpi = 300, device = "pdf",
+  create.dir = TRUE
+)
+
+
+
+```
+
+## Main text figure - 04:
+Figure 4. Training-related changes in partial correlation between toolmaking performance and brain measures (Δr), while controlling for gross motor skill performance. Steiger’s r-to-z tests were used to identify significant changes. A. Change in association between toolmaking performance and AQ of GM terminations of AF. B. Change in association between toolmaking performance and AQ of GM terminations of SLF II/III. C. Change in association of toolmaking performance and left hemisphere AF terminations. D. Change in association of toolmaking performance and right hemisphere AF terminations. BH-corrected significant results (q < .25) are marked with an asterisk (*). 
+```{r fig_04}
+
+load(here("results", "RData", "results_EXP_toolmaking_prepost_pcorr_change.RData"))
+
+
+make_my_prepost_plot <- function(df_family,
+                         title_prefix = "",
+                         subtitle = "",
+                         lw_sig = 1.2,
+                         lw_nonsig = 0.7) {
+  
+  ggplot2::ggplot(df_family, ggplot2::aes(y = variable_label)) +
+    ggplot2::geom_point(ggplot2::aes(x = pre_r),
+                        shape = 21, size = 3, fill = "gray70",
+                        color = "black", stroke = 0.25, na.rm = TRUE) +
+    ggplot2::geom_point(ggplot2::aes(x = post_r),
+                        shape = 16, size = 3,
+                        color = "black", na.rm = TRUE) +
+    ggplot2::geom_vline(xintercept = 0, color = "grey75", linewidth = 0.3) +
+    ggplot2::geom_segment(
+      ggplot2::aes(
+        x = pre_r, xend = post_r, yend = variable_label,
+        color = dir,
+        linewidth = ifelse(sig, lw_sig, lw_nonsig)  
+      ),
+      arrow = grid::arrow(length = grid::unit(2.2, "mm"), type = "closed", ends = "last"),
+      na.rm = TRUE
+    ) +
+    ggplot2::scale_linewidth_identity() +
+    ggplot2::geom_text(
+  ggplot2::aes(
+    x = (pre_r + post_r)/2,
+    label = sprintf("Delta*r==%+.2f", delta_r)
+  ),
+  parse = TRUE,
+  size = 4, vjust = -0.6, show.legend = FALSE, na.rm = TRUE, color = "black"
+) +
+    ggplot2::geom_text(ggplot2::aes(x = -1.05, label = ifelse(sig, "*", "")),
+                       size = 7.5, hjust = 0, color = "black", na.rm = TRUE) +
+    ggplot2::geom_text(ggplot2::aes(x = 1.05, label = paste0("(n = ", n, ")")),
+                       size = 3.5, hjust = 1, color = "gray35", na.rm = TRUE) +
+    ggplot2::coord_cartesian(xlim = c(-1, 1)) +
+    ggplot2::scale_color_manual(values = c(Increase = color$correlation$high,
+                                           Decrease = color$correlation$low), name="") +
+    ggplot2::scale_y_discrete(limits = rev) +
+    ggplot2::labs(
+      title = paste(title_prefix),
+      subtitle = subtitle,
+      x = "Partial r (–1 to 1)",
+      y = NULL
+    ) +
+    ggplot2::theme_classic(base_size = 12) +
+    ggplot2::theme(
+      panel.grid.major.y = ggplot2::element_blank(),
+      legend.position = "top",
+      plot.title = ggplot2::element_text(face = "bold"),
+      plot.subtitle = ggplot2::element_text(color = "gray20")
+    )
+}
+
+
+AQ_AF <- results_EXP_toolmaking_prepost_pcorr_change$AQ_AF
+AQ_AF_plot <- make_my_prepost_plot(
+    df_family = AQ_AF,
+    title_prefix = "Post-training change in partial correlation",
+    subtitle = paste0("(toolmaking performance x AQ of AF GM terminations)")
+  )
+
+AQ_SLF <- results_EXP_toolmaking_prepost_pcorr_change$AQ_SLF
+AQ_SLF_plot <- make_my_prepost_plot(
+    df_family = AQ_SLF,
+    title_prefix = "Post-training change in partial correlation",
+    subtitle = paste0("(toolmaking performance x AQ of SLF II/III GM terminations)")
+  )
+
+AF_GM_L <- results_EXP_toolmaking_prepost_pcorr_change$AF_L
+AF_GM_L_plot <- make_my_prepost_plot(
+    df_family = AF_GM_L,
+    title_prefix = "Post-training change in partial correlation",
+    subtitle = paste0("(toolmaking performance x left AF GM terminations)")
+  )
+
+AF_GM_R <- results_EXP_toolmaking_prepost_pcorr_change$AF_R
+AF_GM_R_plot <- make_my_prepost_plot(
+    df_family = AF_GM_R,
+    title_prefix = "Post-training change in partial correlation",
+    subtitle = paste0("(toolmaking performance x right AF GM terminations)")
+  )
+
+# for patchwork : to combine subplots
+layout <- "
+AB
+CD
+"
+
+combined_prepost <- wrap_plots(AQ_AF_plot, AQ_SLF_plot, AF_GM_L_plot, AF_GM_R_plot, design = layout) +
+  plot_annotation(tag_levels = list(c("A", "B", "C", "D"))) &
+  theme(
+    plot.tag = element_text(size = 14, face = "bold")  # adjust size as needed
+  )
+
+combined_prepost
+
+ggsave(
+  filename = here("results", "manuscript_figures", "fig-04_prepost_toolmaking_pcorr.pdf"),
+  plot = combined_prepost, width = 12, height = 8, dpi = 300, device = 'pdf',
+  create.dir = TRUE
+)
+
+```
+
+
+## Main text figure - 05:
+Figure 5. Training-related changes in simple Pearson’s correlation between PCA component (PC thin) and brain measures (Δr). Steiger’s r-to-z tests were used to identify significant changes. A. Change in association between PC thin and white matter tract metrics. B. PC thin and GM terminations of AF (right). C. Changes in the association of PC thin and GM terminations of SLF II/III. BH-corrected significant results (q < .25) are marked with an asterisk (*).
+
+```{r fig_05}
+
+`%||%` <- function(a, b) if (!is.null(a)) a else b
+
+make_my_PCA_plot <- function(
+    tidy,
+    family_label = NULL,
+    order_vec    = NULL,
+    title        = NULL,
+    subtitle     = NULL,
+    filename     = NULL,
+    col_up       = color$correlation$high,
+    col_down     = color$correlation$low,
+    bh_thresh    = DEFAULT_FDR_THRESHOLD,
+    facet_families = TRUE,
+    star_x       = -0.95,
+    star_size    = 8
+) {
+  
+  dat_all <- tidy
+  if (!is.null(family_label)) {
+    dat_all <- dat_all %>% dplyr::filter(family %in% family_label)
+  }
+  
+  dat_all <- dat_all %>%
+    dplyr::mutate(
+      delta_r = post_r - pre_r,
+      dir     = ifelse(delta_r >= 0, "Increase", "Decrease"),
+      mid_r   = (pre_r + post_r) / 2,
+      sig     = !is.na(z_p_BH) & z_p_BH < bh_thresh
+    )
+  
+  if (!is.null(order_vec)) {
+    dat <- dat_all %>%
+      dplyr::mutate(variable = factor(variable, levels = rev(order_vec))) %>%
+      dplyr::arrange(family, desc(variable))
+  } else {
+    dat <- dat_all %>%
+      dplyr::group_by(family) %>%
+      dplyr::group_modify(function(.x, .k) {
+        lv <- .vars_in_order(.x, prefer_pc = "PC_thin")
+        if (!length(lv)) lv <- unique(.x$variable)
+        .x %>% dplyr::mutate(variable = factor(variable, levels = rev(lv)))
+      }) %>%
+      dplyr::ungroup()
+  }
+  
+  p <- ggplot(dat, aes(y = variable)) +
+    geom_segment(aes(x = pre_r, xend = post_r, yend = variable, color = dir,
+                     linewidth = ifelse(sig, 1.2, 0.7)),
+                 arrow = grid::arrow(length = unit(2.2, "mm"), type = "closed", ends = "last"),
+                 na.rm = TRUE) +
+    geom_point(aes(x = pre_r), shape = 21, size = 3, stroke = 0.5,
+               fill = "white", color = "black", na.rm = TRUE) +
+    geom_point(aes(x = post_r, shape = dir, color = dir), size = 3, na.rm = TRUE) +
+    scale_shape_manual(values = c(Increase = 62, Decrease = 60),
+                       breaks = c("Increase","Decrease"), na.translate = FALSE, name = "") +
+    scale_color_manual(values = c(Increase = col_up, Decrease = col_down),
+                       breaks = c("Increase","Decrease"), na.translate = FALSE, name = "") +
+    scale_linewidth_identity() +
+    geom_text(
+  aes(x = mid_r, label = sprintf("Delta*r==%+.2f", delta_r)), parse = TRUE,
+              color = "black", size = 3.5, vjust = -0.6, show.legend = FALSE, na.rm = TRUE) +
+    geom_text(data = dplyr::filter(dat, sig),
+              aes(x = star_x, label = "*"),
+              inherit.aes = TRUE, color = "black",
+              size = star_size, hjust = 1, vjust = 0.7, na.rm = TRUE) +
+    geom_text(aes(x = 0.95, label = paste0("(n = ", n, ")")),
+              inherit.aes = TRUE, color = "grey30",
+              size = 3.5, hjust = 1, vjust = 0.7, show.legend = FALSE, na.rm = TRUE) +
+    geom_vline(xintercept = 0, color = "grey75", linewidth = 0.3) +
+    coord_cartesian(xlim = c(-1, 1)) +
+    { if (facet_families) facet_grid(rows = vars(family), cols = vars(pc), scales = "free_y")
+      else facet_wrap(~ pc, nrow = 1) } +
+    scale_y_discrete(labels = ~ gsub("_", " ", .x)) +
+    labs(
+      title    = title %||% "Change in PCA–brain association",
+      subtitle = subtitle,
+      x = "Pearson r (–1 to 1)", y = NULL
+    ) +
+    theme_classic(base_size = 14) +
+    theme(
+      panel.grid.major.y = element_blank(),
+      plot.title = element_text(face = "bold"),
+      legend.position = "none"
+    )
+  return(p)
+  
+}
+
+#=====================================
+df_exp <- data %>% dplyr::filter(group == "exp")
+
+these_families <- list(
+    WM      = var$WM_measures,
+    AF_L    = var$AF_L_GM_terminations,
+    AF_R    = var$AF_R_GM_terminations,
+    SLF_L   = var$SLF_L_GM_terminations,
+    SLF_R   = var$SLF_R_GM_terminations
+  )
+
+pca_measures <- c("PC_thin", "PC_long")
+
+titles_pca_change <- list(
+  WM     = "PC-thin × WM",
+  AF_L   = "PC-thin × AF left GM",
+  AF_R   = "PC-thin × AF right GM",
+  SLF_L  = "PC-thin × SLF II/III left GM",
+  SLF_R  = "PC-thin × SLF II/III right GM"
+)
+
+# run all families once
+tidy_all <- run_pca_families_prepost(df_exp, these_families, pca_vars = pca_measures)
+
+plots_PCA <- list()
+
+for (fam in names(these_families)) {
+
+  tidy_fam <- tidy_all %>% dplyr::filter(family == fam) %>% dplyr::filter(pc == "PC_thin")
+
+  # keep your family variable order
+  ord <- as.character(these_families[[fam]])
+  ord <- ord[ord %in% tidy_fam$variable]
+
+  tidy_fam <- tidy_fam %>%
+    dplyr::mutate(variable = factor(variable, levels = ord)) %>%
+    dplyr::arrange(variable)
+
+  #-----------------------
+  # PLOT (weighted arrows)
+  #-----------------------
+  tidy_plot <- tidy_fam %>% dplyr::mutate(variable = as.character(variable))
+
+  p <- make_my_PCA_plot(
+    tidy_plot,
+    family_label   = fam,
+    order_vec      = ord,
+    facet_families = FALSE,
+    title          = titles_pca_change[[fam]] %||% paste0("(", fam, ")")
+  )
+
+ plots_PCA[[fam]] <- p
+}
+
+# for patchwork : to combine subplots
+layout <- "
+AABBBCCC
+AADDDEEE
+"
+
+combined_PCA <- wrap_plots(plots_PCA$WM, plots_PCA$AF_L, plots_PCA$AF_R, plots_PCA$SLF_L, plots_PCA$SLF_R, design = layout) +
+  plot_annotation(tag_levels = list(c("A", "B", "C", "D", "E"))) &
+  theme(
+    plot.tag = element_text(size = 14, face = "bold")
+  )
+
+combined_PCA
+
+ggsave(
+  filename = here("results", "manuscript_figures", "fig-05_PC-thin_brain.pdf"),
+  plot = combined_PCA, width = 14, height = 8, dpi = 300, device = "pdf",
+  create.dir = TRUE
+)
+
+```
+
+## Main text figure - 06:
+Figure 6. Hierarchical action sequencing and morphological organization in Acheulean handaxe production A. Illustration of a set of sequential actions used to produce Acheulean handaxes (flip the core, strike with a percussor, detach flake, strike). B. Finished product of an Acheulean handaxe and its associated debitage during the production. C. PCA dimensions of handaxe morphology component 1=cross-sectional thinning, component 2=elongation as per original study (figure adapted from (31, 63)).
+```{r fig_06_methods}
+
+part_A       <- read_as_plot(here("results", "import", "methods_toolmaking_syntax.png"))
+part_B       <- read_as_plot(here("results", "import", "methods_Acheulean_handaxe.png"))
+part_C       <- read_as_plot(here("results", "import", "methods_PCA_handaxe.png"))
+
+
+# for patchwork : to combine subplots
+layout <- "
+AABC
+"
+
+combined_fig <- wrap_plots(part_A, part_B, part_C, design = layout) +
+  plot_annotation(tag_levels = list(c("A", "B", "C"))) &
+  theme(
+    plot.tag = element_text(size = 14, face = "bold")  # adjust size as needed
+  )
+
+combined_fig
+
+ggsave(
+  filename = here("results", "manuscript_figures", "fig-06_methods_panel.pdf"),
+  plot = combined_fig, width = 12, height = 2.5, dpi = 300, device = "pdf",
+  create.dir = TRUE
+)
+
+rm(df)
+```
+
+
