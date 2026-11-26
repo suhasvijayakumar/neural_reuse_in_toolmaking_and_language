@@ -1,4 +1,4 @@
-# The same but different: evidence for the co-evolution of language and toolmaking through neural re-use
+# The same but different: neuroplastic differentiation of language and toolmaking
 
 This project is a **work in progress**.
 
